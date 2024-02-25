@@ -5,6 +5,7 @@ import Itemp from '../Item/Item.jsx'
 const Populars = () => {
 
 const [popularProducts,setPopularProducts]= useState([]);
+
 useEffect(()=>{
 fetch('http://localhost:4000/popularinwomen')
 .then((response)=>response.json())

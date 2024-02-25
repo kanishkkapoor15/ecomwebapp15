@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(cors());
 
 //Database connection with MongoDB
-mongoose.connect("mongodb+srv://kanishkkapoor15:@cluster0.knqbwwa.mongodb.net/ecomwebapp15")
+mongoose.connect("mongodb+srv://kanishkkapoor15:kanishkkapoor@cluster0.knqbwwa.mongodb.net/ecomwebapp15")
 
 //API CREATION
 app.get("/",(req,res)=>{
@@ -74,6 +74,47 @@ const Product = mongoose.model("Product",{
         type:Boolean,
         default:true,
     },
+    ratings: {
+        type: Number,
+        default: 0,
+      },
+      stock: {
+        type: Number,
+        required: [true, "Please Enter product Stock"],
+        maxLength: [4, "Stock cannot exceed 4 characters"],
+        default: 1,
+      },
+      numOfReviews: {
+        type: Number,
+        default: 0,
+      },
+      reviews: [
+        {
+          user: {
+            type: mongoose.Schema.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          name: {
+            type: String,
+            required: true,
+          },
+          rating: {
+            type: Number,
+            required: true,
+          },
+          comment: {
+            type: String,
+            required: true,
+          },
+        },
+      ],
+      user: {
+        type: mongoose.Schema.ObjectId,
+        ref: "User",
+       
+      },
+    
 })
 
 app.post('/addproduct',async (req,res)=>{
@@ -94,6 +135,7 @@ app.post('/addproduct',async (req,res)=>{
         category:req.body.category,
         new_price:req.body.new_price,
         old_price:req.body.old_price,
+        stock:req.body.stock,
     });
     console.log(product);
     await product.save();
@@ -144,6 +186,7 @@ const Users = mongoose.model('Users',{
         type:Date,
         default:Date.now,
       }
+    
 })
 
 // Creating Endpoint for registering the user
@@ -214,7 +257,7 @@ app.get('/newcollections',async(req,res)=>{
 
 })
 
-//#creating endpoint for pupular in women section
+//#creating endpoint for popular in women section
 
 app.get('/popularinwomen',async(req,res)=>{
     let products = await Product.find({category:"women"});
@@ -266,6 +309,9 @@ app.post('/removefromcart',fetchUser,async(req,res)=>{
     res.send("removed from the cart")
 }) 
 
+
+
+
 //creating endpoint to get cartdata
 app.post('/getcart',fetchUser,async(req,res)=>{
     console.log("GetCart");
@@ -274,6 +320,105 @@ app.post('/getcart',fetchUser,async(req,res)=>{
     res.json(userData.cartData);
 
 })
+
+// creating product search endpoint
+app.get('/search', async (req, res) => {
+    try {
+      const query = req.query.q;
+      const products = await Product.find({ name: { $regex: query, $options: 'i' } });
+      res.json(products);
+    } catch (error) {
+      console.error('Error searching for products:', error);
+      res.status(500).json({ error: 'An error occurred while searching for products.' });
+    }
+  });
+
+
+
+// Endpoint to allow users to post product reviews
+app.post('/api/products/:productId/reviews', fetchUser, async (req, res) => {
+    try {
+      const productId = req.params.productId;
+      const { rating, comment } = req.body;
+      
+      // Get user information from JWT token
+      const userId = req.user.id;
+  
+      // Fetch user details from Users model
+      const user = await Users.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+  
+      // Create the review object
+      const review = {
+        user: userId,
+        name: user.name, // Populate name from user details
+        rating: Number(rating),
+        comment,
+      };
+  
+      // Find the product by ID and update its reviews array
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+      product.reviews.push(review);
+      product.numOfReviews = product.reviews.length;
+      await product.save();
+  
+      res.status(201).json({ success: true, message: 'Review added successfully' });
+      console.log("Review added Successfully");
+    } catch (error) {
+      console.error('Error adding review:', error);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+  });
+
+
+  // Endpoint to fetch product reviews by product ID
+app.get('/api/products/:productId/reviews', async (req, res) => {
+    try {
+      const productId = req.params.productId;
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+      res.status(200).json({ success: true, reviews: product.reviews });
+      console.log("Reviews Fetched Successfully!")
+    } catch (error) {
+      console.error('Error fetching product reviews:', error);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+  });
+
+
+
+
+
+// //Applying product schema changes to all the products present in the database
+// async function migrateProducts() {
+//      // Update existing products with new schema fields and default values
+//      const result = await Product.updateMany(
+//         {},
+//         {
+//           $set: {
+//             ratings: 0,
+//             stock: 1,
+//             numOfReviews: 0,
+//             reviews: [],
+//             user: null
+//           }
+//         }
+//       );
+  
+//       console.log(`${result.nModified} products updated successfully`);
+// }
+// migrateProducts(); 
+  
+  
+
+
 
 
 app.listen(port,(error)=>{

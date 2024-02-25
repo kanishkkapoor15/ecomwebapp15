@@ -48,6 +48,13 @@
     color: white;
     font-size: 22px;
     font-weight: 500;
+    cursor: pointer;
+    text-decoration-line: none;
+}
+.hero-latest-btn-text{
+    text-decoration: none;
+    color: #090909;
+    text-decoration-line: underline;
 }
 
 .hero-right{

@@ -7,6 +7,7 @@ import { ShopContext } from '../../Context/ShopContext'
 import { useRef } from 'react'
 import nav_dropdown_icon from '../Assets/nav-dropdown.png'
 import brand_logo from '../Assets/brandLogo.png'
+import SearchBar from '../SearchBar/SearchBar'
 
 
 
@@ -23,10 +24,12 @@ const Navbar = () => {
   return (
     <div className='Navbar'>
      <div className="nav-logo">
-        <img className="nav-brand-logo"src={logo} alt="" />
+        <Link to={'/'}> <img className="nav-brand-logo" src={logo} alt="" /></Link>
         <img className="nav-brand-name" src={brand_logo} alt="" />
      </div>
-
+     <div className='nav-search-product'>
+     <SearchBar/>
+     </div>
      <div className='nav-dropdown'>
      <img onClick={dropdown_toggle} src={nav_dropdown_icon} alt="" />
      </div>

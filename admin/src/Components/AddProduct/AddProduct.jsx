@@ -10,7 +10,8 @@ const AddProduct = () => {
     image:"",
     category:"women",
     new_price:"",
-    old_price:""
+    old_price:"",
+    stock:""
 
    })
 
@@ -73,6 +74,10 @@ const AddProduct = () => {
         <div className="addproduct-itemfield">
             <p>Offer Price</p>
             <input value={productDetails.new_price} onChange={changeHandler} type="text" name='new_price' placeholder='Type Here' />
+        </div>
+        <div className="addproduct-itemfield">
+            <p>Stock Quantity</p>
+            <input value={productDetails.stock} onChange={changeHandler} type="text" name='stock' placeholder='Type Here' />
         </div>
       </div>
 

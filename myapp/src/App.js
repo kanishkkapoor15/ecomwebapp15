@@ -10,6 +10,8 @@ import{BrowserRouter,Routes,Route} from 'react-router-dom';
 import men_banner from './Components/Assets/banner_mens.png'
 import women_banner from './Components/Assets/banner_women.png'
 import kid_banner from './Components/Assets/banner_kids.png'
+import SearchResults from './Pages/SearchResults.jsx';
+import SearchBar from './Components/SearchBar/SearchBar.jsx';
 
 function App() {
   return (
@@ -26,6 +28,9 @@ function App() {
          </Route>  
          <Route path='/cart' element={<Cart/>}/>
          <Route path='/login' element={<LoginSignup/>}/>
+         <Route exact path='/' Component={SearchBar}/>
+         <Route path='/SearchResults'  Component={SearchResults}/>
+
          
       </Routes>
       <Footer/>
