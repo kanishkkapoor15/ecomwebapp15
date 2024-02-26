@@ -1,0 +1,129 @@
+
+.ProductReviews{
+    margin: 120px 170px;
+    margin-top: -30px;
+
+}
+.product-reviews-box{
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    border: 1px solid #d0d0d0;
+    padding: 48px;
+    padding-bottom: 70px;
+}
+.product-reviews-box hr{
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+.product-reviews-box li{
+    list-style-type: none;
+
+}
+.product-reviews-username img{
+   width: 3%;
+   margin-bottom: -9px;
+}
+.product-reviews-username b{
+    margin-left: 2px;
+    font-size: 18px;
+}
+
+.product-reviews-box-navigator{
+    display: flex;
+    
+}
+.product-reviews-nav-box{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    width: 171px;
+    height: 70px;
+    border: 1px solid #d0d0d0;
+    cursor: pointer;
+    
+    
+} 
+.product-reviews-nav-post-box{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    width: 171px;
+    height: 70px;
+    border: 1px solid #d0d0d0;
+    cursor: pointer;
+}
+.product-reviews-post-box{
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid #d0d0d0;
+    padding: 48px;
+    padding-bottom: 70px;
+}
+.product-reviews-post-box-rating{
+
+    
+
+}
+.product-reviews-post-box-rating input{
+    margin-left: 10px;
+    width:25px;
+    border: solid;
+    border-color: #797878;
+    border-radius: 5px;
+    border-width: 1px;
+   
+ }
+   
+.product-reviews-post-box-comment{
+
+
+
+}
+
+.product-reviews-post-box-comment textarea{
+ width: 100%;
+        height: 150px; /* Adjust height as needed */
+        padding: 10px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        resize: vertical; /* Allow vertical resizing */
+
+    
+ }
+   
+.product-reviews-post-box button{
+    width: 152px;
+    height: 30px;
+    border-radius: 35px;
+    background: #121212;
+    border: none;
+    color:white;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 30px;
+    cursor: pointer;
+}
+
+.stars {
+    font-size: 24px;
+  }
+  
+  .stars span {
+    color: #ccc; /* Default color for empty stars */
+    cursor: pointer;
+  }
+  
+  .stars span.filled {
+    color: #ff4141; /* Color for filled stars */
+  }
