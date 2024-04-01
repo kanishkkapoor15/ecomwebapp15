@@ -7,6 +7,9 @@ const multer = require("multer");
 const path = require("path");
 const cors = require("cors");
 const { log } = require("console");
+const tf = require('@tensorflow/tfjs-node');
+const { createCanvas, loadImage } = require('canvas');
+
 
 app.use(express.json());
 app.use(cors());
@@ -61,6 +64,14 @@ const Product = mongoose.model("Product",{
     new_price:{
         type:Number,
         required:true,
+    },
+    type:{
+        type:String,
+        default:"shirt"
+    },
+    color:{
+        type:String,
+        default:"black",
     },
     old_price:{
         type:Number,
@@ -185,7 +196,28 @@ const Users = mongoose.model('Users',{
       date:{
         type:Date,
         default:Date.now,
+      },
+      country_code:{
+        type:String,
+        default:"null",
+      },
+      phone:{
+        type:String,
+        default: "000000000000",
+      },
+      address1:{
+        type:String,
+        default:"null",
+      },
+      address2:{
+        type:String,
+        default:"null",
+      },
+      profile_image:{
+        type:String,
+        default:"null",
       }
+
     
 })
 
@@ -211,7 +243,9 @@ app.post('/signup',async(req,res)=>{
 
     const data = {
         user:{
-            id: user.id
+            id: user.id,
+            name: user.name,
+            email: user.email
         }
     }
 
@@ -231,7 +265,9 @@ app.post('/login',async(req,res)=>{
         if (passCompare){
             const data = {
                 user:{
-                    id: user.id
+                    id: user.id,
+                    name: user.name,
+                    email: user.email
                 }
 
             }
@@ -309,6 +345,25 @@ app.post('/removefromcart',fetchUser,async(req,res)=>{
     res.send("removed from the cart")
 }) 
 
+//API to clear all items at once
+app.post('/clear-cart', fetchUser, async (req, res) => {
+  try {
+    // Fetch the user data
+    let userData = await Users.findOne({_id:req.user.id});
+    while(userData.cartData[req.body.itemId] >0){
+
+    
+    userData.cartData[req.body.itemId] -= 1;
+    }
+    // Save the updated user data
+    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData});
+    res.json({ message: 'Cart cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing cart:', error);
+    res.status(500).json({ error: 'An error occurred while clearing cart' });
+  }
+});
+
 
 
 
@@ -321,17 +376,53 @@ app.post('/getcart',fetchUser,async(req,res)=>{
 
 })
 
-// creating product search endpoint
+// Get products by name or type
+// Backend code to handle multiple words in the search query
+const querystring = require('querystring');
+
 app.get('/search', async (req, res) => {
-    try {
-      const query = req.query.q;
-      const products = await Product.find({ name: { $regex: query, $options: 'i' } });
-      res.json(products);
-    } catch (error) {
-      console.error('Error searching for products:', error);
-      res.status(500).json({ error: 'An error occurred while searching for products.' });
+  try {
+    const query = req.query.q;
+    const words = query.split(',').map(word => word.trim()); // Split query string at commas and trim each word
+
+    const searchResults = [];
+
+    // Perform the search for each word in the query
+    for (const word of words) {
+      const products = await Product.find({
+        $or: [
+          { name: { $regex: word, $options: 'i' } },
+          { type: { $regex: word, $options: 'i' } }
+        ]
+      });
+
+      // Add unique products from the current search results to the overall search results
+      products.forEach(product => {
+        if (!searchResults.some(p => p._id.toString() === product._id.toString())) {
+          searchResults.push(product);
+        }
+      });
     }
-  });
+
+    // Check if "category" parameter is provided
+    let category = req.query.category;
+    // URL-decode the category value to remove '%27'
+    if (category) {
+      category = querystring.unescape(category);
+    }
+
+    // Filter the search results based on the category if provided
+    const filteredResults = category ? searchResults.filter(product => product.category === category) : searchResults;
+
+    res.json(filteredResults);
+  } catch (error) {
+    console.error('Error searching for products:', error);
+    res.status(500).json({ error: 'An error occurred while searching for products.' });
+  }
+});
+
+  
+  
 
 
 
@@ -393,31 +484,444 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
   });
 
 
+  // Handle image feature extraction here
+
+  const featureStorage = multer.diskStorage({
+    destination: './upload/features',
+    filename: (req, file, cb) => {
+        return cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`)
+    }
+});
+
+const featureUpload = multer({ storage: featureStorage });
+
+
+// Load pre-trained MobileNet model
+const mobilenet = require('@tensorflow-models/mobilenet');
+let model;
+
+async function loadModel() {
+    try {
+        model = await mobilenet.load();
+        console.log('MobileNet model loaded');
+
+        // Process products after the model is loaded
+        // await processProducts();
+    } catch (error) {
+        console.error('Error loading MobileNet model:', error);
+    }
+}
+// async function processProducts() {
+//     try {
+//         const products = await Product.find({});
+
+//         // Process each product
+//         for (const product of products) {
+//             try {
+//                 const image = await loadImage(product.image); // Load the image
+
+//                 const canvas = createCanvas(image.width, image.height);
+//                 const ctx = canvas.getContext('2d');
+//                 ctx.drawImage(image, 0, 0, image.width, image.height);
+
+//                 // Preprocess image and convert to Tensor
+//                 const tensor = tf.browser.fromPixels(canvas)
+//                     .resizeNearestNeighbor([224, 224]) // Resize image to match MobileNet input size
+//                     .toFloat()
+//                     .expandDims();
+
+//                 // Extract features using MobileNet model
+//                 const predictions = await model.classify(tensor);
+
+//                  // Sort predictions by probability in descending order
+//                  predictions.sort((a, b) => b.probability - a.probability);
+//                  const classNames = predictions.map(prediction => prediction.className);
+         
+//                  // // Get the class name with the highest probability
+//                  // const mostProbableClass = predictions[0].className;
+//                  // Concatenate class names into a single string
+//                  const mostProbableClass = classNames.join(', ');         
+
+//                 product.type = mostProbableClass;
+//                 console.log(`Type initialized for product ${product.name}: ${mostProbableClass}`);
+//                 // Save the updated product back to the database
+//                 await product.save();
+
+//             } catch (error) {
+//                 console.error('Error processing product:', error);
+//             }
+//         }
+
+//         console.log('Type initialization process completed.');
+//     } catch (error) {
+//         console.error('Error retrieving products:', error);
+//     }
+// }
+
+loadModel();
+
+app.post("/extract-features", featureUpload.single('image'), async (req, res) =>  {
+    try {
+        const image = await loadImage(req.file.path);
+        const canvas = createCanvas(image.width, image.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+
+        // Preprocess image and convert to Tensor
+        const tensor = tf.browser.fromPixels(canvas)
+            .resizeNearestNeighbor([224, 224]) // Resize image to match MobileNet input size
+            .toFloat()
+            .expandDims();
+
+        // Extract features using MobileNet model
+        const predictions = await model.classify(tensor);
+
+        // Sort predictions by probability in descending order
+        predictions.sort((a, b) => b.probability - a.probability);
+        const classNames = predictions.map(prediction => prediction.className);
+
+        // // Get the class name with the highest probability
+        // const mostProbableClass = predictions[0].className;
+        // Concatenate class names into a single string
+        const mostProbableClass = classNames.join(', ');
+
+        // Return the most probable class name as JSON response
+        res.json({ className: mostProbableClass });
+
+    } 
+    catch (error) {
+        console.error('Error processing image:', error);
+        res.status(500).json({ error: 'Error processing image' });
+    }
+});
 
 
 
-// //Applying product schema changes to all the products present in the database
-// async function migrateProducts() {
+
+
+
+
+
+//Retrieve all products from the database to initialize product type using tensor flow CNN
+// Product.find({})
+// .then(async (products) => {
+    
+//     // Process each product
+//     for (const product of products) {
+//         try {
+                  
+
+//         const image = await loadImage(product.image);
+//         console.log("Image Loaded");
+
+//         const canvas = createCanvas(image.width, image.height);
+//         console.log("Image processed in canvas",image.width,image.height);
+
+//         const ctx = canvas.getContext('2d');
+//         console.log("ctx");
+//         ctx.drawImage(image, 0, 0, image.width, image.height);
+//         console.log("ctx draw");
+
+
+//         // Preprocess image and convert to Tensor
+//         const tensor = tf.browser.fromPixels(canvas)
+//             .resizeNearestNeighbor([224, 224]) // Resize image to match MobileNet input size
+//             .toFloat()
+//             .expandDims();
+//             console.log("tensor");
+
+//         // Extract features using MobileNet model
+//         const predictions = await model.classify(tensor);
+//         console.log("tensor classify");
+
+
+//         // Sort predictions by probability in descending order
+//         predictions.sort((a, b) => b.probability - a.probability);
+
+//         // Get the class name with the highest probability
+//         const mostProbableClass = predictions[0].className;
+        
+//         product.type = mostProbableClass;
+//         console.log(`Type initialized for product ${product.name}: ${mostProbableClass}`);
+//          // Save the updated product back to the database
+//          await product.save();
+
+//         } 
+//         catch (error) {
+//             console.error('Error processing product:', error);
+//         }
+//     }
+
+//     console.log('Type initialization process completed.');
+// })
+// .catch((error) => {
+//     console.error('Error retrieving products:', error);
+// });
+
+
+
+
+// //Applying user schema changes to all the products present in the database
+// async function migrateUsers() {
 //      // Update existing products with new schema fields and default values
-//      const result = await Product.updateMany(
+//      const result = await Users.updateMany(
 //         {},
 //         {
 //           $set: {
-//             ratings: 0,
-//             stock: 1,
-//             numOfReviews: 0,
-//             reviews: [],
-//             user: null
+//           country_code:"null",
+//           phone:"0000000000",
+//           address1:"null",
+//           address2:"null",
+//           profile_image:"null",
+          
+
 //           }
 //         }
 //       );
   
-//       console.log(`${result.nModified} products updated successfully`);
+//       console.log(`${result.nModified} users updated successfully`);
 // }
-// migrateProducts(); 
+// migrateUsers(); 
   
+  
+const orderSchema = new mongoose.Schema({
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      
+    },
+    userEmail: {
+      type: String,
+      required: true
+      
+    },
+    userName: {
+        type: String,
+        required: true
+        
+      },
+    dateOfOrder: {
+      type: Date,
+      default: Date.now
+    },
+    modeOfPayment: {
+      type: String,
+      required: true
+    },
+    paymentStatus: {
+      type: String,
+      required: true
+    },
+    totalAmount: {
+      type: Number,
+      required: true
+    },
+    cartData: {
+      type: Object,
+      required: true
+    }
+  });
   
 
+  const Order = mongoose.model('Order', orderSchema);
+
+
+  // POST endpoint for processing orders
+// Endpoint to process orders
+app.post('/process-order', fetchUser,async (req, res) => {
+    try {
+          // Ensure req.user contains necessary properties
+          if (!req.user || !req.user.email || !req.user.name) {
+            return res.status(400).json({ error: 'User information not found in the token.' });
+        }
+
+        let { userId,userEmail,userName,modeOfPayment, paymentStatus, totalAmount, cartData } = req.body;
+         userId = req.user.id;
+         userEmail = req.user.email;
+         userName = req.user.name;
+
+
+  
+      // Create a new order document
+      const newOrder = new Order({
+        userId,
+        userEmail,
+        userName,
+        modeOfPayment,
+        paymentStatus,
+        totalAmount,
+        cartData
+      });
+  
+      // Save the order to the database
+      await newOrder.save();
+
+      const updatedCartData = {};
+      for (let i = 0; i < 300; i++) {
+        updatedCartData[i] = 0;        
+       }
+
+      // Update the user's cartData with the updated cartData object
+      await Users.findByIdAndUpdate(userId, { $set: { cartData: updatedCartData } });
+      // Return a success message
+      res.status(200).json({ message: 'Order processed successfully', orderId: newOrder._id });
+    } catch (error) {
+      // Return an error message if there's any issue processing the order
+      console.error('Error processing order:', error);
+      res.status(500).json({ error: 'An error occurred while processing the order' });
+    }
+  });
+
+  // Define the route for fetching orders by user ID
+app.get('/user/orders', fetchUser, async (req, res) => {
+  try {
+      // Ensure req.user contains necessary properties
+      if (!req.user || !req.user.id) {
+          return res.status(400).json({ error: 'User information not found in the token.' });
+      }
+
+      // Fetch orders by user ID
+      const orders = await Order.find({ userId: req.user.id });
+
+      res.status(200).json(orders);
+  } catch (error) {
+      console.error('Error fetching user orders:', error);
+      res.status(500).json({ error: 'An error occurred while fetching user orders' });
+  }
+});
+
+
+  //Update user details, MyAccount Page
+
+  app.put('/user',fetchUser, async (req, res) => {
+    const userId = req.user.id; // Assuming req.user contains the authenticated user's ID
+    const updateFields = req.body;
+
+    try {
+        // Check if the user exists
+        const user = await Users.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Update the user fields
+        for (const [key, value] of Object.entries(updateFields)) {
+            if (user[key] !== undefined) {
+                user[key] = value;
+            }
+        }
+
+        // Save the updated user
+        await user.save();
+
+        res.json({ message: 'User updated successfully', user: user });
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ error: 'An error occurred while updating user' });
+    }
+});
+
+// Route to get details of a single authenticated user
+app.get('/user', fetchUser, async (req, res) => {
+  try {
+    // Get the user ID from the request
+    const userId = req.user.id;
+
+    // Find the user in the database using the ID
+    const user = await Users.findById(userId);
+
+    // Check if the user exists
+    if (!user) {
+        return res.status(404).json({ errors: 'User not found' });
+    }
+
+    // Construct the response with required user details
+    const userDetails = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        address1: user.address1,
+        address2: user.address2,
+        phone: user.phone,
+        country_code: user.country_code,
+        profile_image: user.profile_image
+        // Add other fields as needed
+    };
+
+    // Send the response with user details
+    res.json(userDetails);
+} catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ errors: 'An error occurred while fetching user details' });
+}
+});
+
+
+// Define storage for profile image uploads
+const profileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+      cb(null, 'uploads/profiles') // Destination folder for storing profile images
+  },
+  filename: function (req, file, cb) {
+      cb(null, Date.now() + '-' + file.originalname) // Unique filename for each uploaded image
+  }
+});
+
+// Initialize multer upload middleware for profile images
+const profileUpload = multer({ storage: profileStorage });
+
+// Define the route for uploading profile image
+app.post('/user/profile-image', fetchUser, profileUpload.single('profileImage'), async (req, res) => {
+  const userId = req.user.id; // Assuming req.user contains the authenticated user's ID
+  const profileImageUrl = req.file.path; // File path of the uploaded image
+
+  try {
+      // Check if the user exists
+      const user = await Users.findById(userId);
+      if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Update the profile image field
+      user.profile_image = profileImageUrl;
+
+      // Save the updated user
+      await user.save();
+
+      res.json({ message: 'Profile image uploaded successfully', profile_image: profileImageUrl });
+  } catch (error) {
+      console.error('Error uploading profile image:', error);
+      res.status(500).json({ error: 'An error occurred while uploading profile image' });
+  }
+});
+
+
+// Define the route for updating profile image
+app.put('/user/profile-image',fetchUser, profileUpload.single('profileImage'), async (req, res) => {
+  const userId = req.user.id; // Assuming req.user contains the authenticated user's ID
+  const profileImageUrl = req.file.path; // File path of the uploaded image
+
+  try {
+      // Check if the user exists
+      const user = await Users.findById(userId);
+      if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Update the profile image field
+      user.profile_image = profileImageUrl;
+
+      // Save the updated user
+      await user.save();
+
+      res.json({ message: 'Profile image updated successfully', profile_image: profileImageUrl });
+  } catch (error) {
+      console.error('Error updating profile image:', error);
+      res.status(500).json({ error: 'An error occurred while updating profile image' });
+  }
+});
+
+  
 
 
 
